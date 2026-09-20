@@ -1,6 +1,6 @@
 # ==============================================================================
 # Master Configuration: Local Autonomous Desktop Assistant for Windows 11
-# Hardware Target: Intel Core i7-10610U (4 Cores / 8 Threads), 32 GB RAM
+# Target Platform: Resource-Constrained / Low-End CPU-only Windows PCs
 # ==============================================================================
 
 app:
@@ -63,9 +63,9 @@ safety:
   backup_dir: "data/backups"
   kill_switch_hotkey: "ctrl+shift+f12"
   sandbox_directories:
-    - "C:\\Users\\Aswin\\OneDrive\\Desktop"
-    - "C:\\Users\\Aswin\\Documents"
-    - "C:\\Users\\Aswin\\Downloads"
+    - "~/Desktop"
+    - "~/Documents"
+    - "~/Downloads"
 
 memory:
   db_path: "data/memory.sqlite3"

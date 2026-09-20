@@ -1,6 +1,6 @@
 # Fully Local Autonomous Desktop Assistant for Windows 11
 
-A fully private, voice-driven, local personal assistant engineered for Windows 11 on the **HP EliteBook 830 G7** (Intel i7-10610U, 32 GB RAM, CPU-only).
+A fully private, voice-driven, local personal assistant engineered for Windows 11 on resource-constrained and low-end CPU-only PCs.
 
 ---
 

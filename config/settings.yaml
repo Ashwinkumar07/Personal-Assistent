@@ -1,0 +1,77 @@
+# ==============================================================================
+# Master Configuration: Local Autonomous Desktop Assistant for Windows 11
+# Hardware Target: Intel Core i7-10610U (4 Cores / 8 Threads), 32 GB RAM
+# ==============================================================================
+
+app:
+  name: "Local Desktop Assistant"
+  version: "0.1.0"
+  log_level: "INFO"
+  log_dir: "logs"
+  data_dir: "data"
+
+hardware:
+  cpu_threads_total: 8
+  cpu_threads_stt: 4
+  cpu_threads_llm: 4
+  cpu_threads_tts: 2
+  max_ram_budget_mb: 10240
+
+voice:
+  # Audio Capture
+  sample_rate: 16000
+  channels: 1
+  chunk_duration_ms: 30
+  push_to_talk_key: "f8"
+
+  # Voice Activity Detection (Silero VAD)
+  vad:
+    enabled: true
+    threshold: 0.5
+    min_speech_duration_ms: 250
+    min_silence_duration_ms: 700
+
+  # Speech-to-Text (faster-whisper)
+  stt:
+    model_size: "base.en" # tiny.en, base.en, or small.en
+    device: "cpu"
+    compute_type: "int8"
+    download_root: "models/whisper"
+    beam_size: 1
+    language: "en"
+
+  # Text-to-Speech (Piper)
+  tts:
+    model_name: "en_US-lessac-medium"
+    models_dir: "models/piper"
+    sample_rate: 22050
+    speaker_id: 0
+    sentence_silence: 0.15
+
+brain:
+  backend: "llama_cpp" # or "ollama"
+  model_path: "models/llm/qwen2.5-3b-instruct-q4_k_m.gguf"
+  context_size: 4096
+  temperature: 0.2
+  num_threads: 4
+  max_tokens: 512
+
+safety:
+  run_as_admin: false
+  recycle_bin_deletes: true
+  backup_before_write: true
+  backup_dir: "data/backups"
+  kill_switch_hotkey: "ctrl+shift+f12"
+  sandbox_directories:
+    - "C:\\Users\\Aswin\\OneDrive\\Desktop"
+    - "C:\\Users\\Aswin\\Documents"
+    - "C:\\Users\\Aswin\\Downloads"
+
+memory:
+  db_path: "data/memory.sqlite3"
+  embedding_model: "all-MiniLM-L6-v2"
+  auto_summarize_interval_hours: 6
+
+concurrency:
+  max_workers: 3
+  worker_priority: "BELOW_NORMAL_PRIORITY_CLASS"

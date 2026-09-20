@@ -1,0 +1,23 @@
+# Core Configuration & Schemas
+pydantic>=2.7.0
+pyyaml>=6.0.1
+psutil>=5.9.8
+
+# Audio & Voice Processing
+sounddevice>=0.4.6
+numpy>=1.26.0
+scipy>=1.12.0
+faster-whisper>=1.0.0
+piper-tts>=1.2.0
+
+# Hotkey & Keyboard controls
+keyboard>=0.13.5
+
+# Windows Automation & UI
+pywin32>=306
+pystray>=0.19.5
+Pillow>=10.2.0
+
+# Testing & Benchmarking
+pytest>=8.1.0
+pytest-asyncio>=0.23.0

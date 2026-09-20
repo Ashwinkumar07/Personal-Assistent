@@ -1,0 +1,41 @@
+# Python & Virtual Environments
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local Model Binaries & Weights (Large files - do not push to Git)
+models/
+*.gguf
+*.bin
+*.onnx
+piper_models/
+faster_whisper_models/
+
+# Application Logs, Databases & Runtime Files
+logs/
+*.log
+*.sqlite3
+*.db
+memory/db/
+data/
+
+# Temporary Audio/Screen captures
+tmp/
+scratch/
+*.wav
+*.mp3
+*.png
+*.jpg
+
+# OS & IDE specific
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

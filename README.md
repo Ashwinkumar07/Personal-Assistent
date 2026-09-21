@@ -1,4 +1,4 @@
-# Fully Local Autonomous Desktop Assistant for Windows 11
+# Fully Local Autonomous Desktop Assistant 
 
 A fully private, voice-driven, local personal assistant engineered for Windows 11 on resource-constrained and low-end CPU-only PCs.
 

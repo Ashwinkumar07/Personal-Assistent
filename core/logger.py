@@ -17,16 +17,27 @@ log_file = LOG_DIR / "assistant.log"
 latency_file = LOG_DIR / "latency.csv"
 action_file = LOG_DIR / "actions.jsonl"
 
+file_handler = logging.FileHandler(log_file, encoding="utf-8")
+file_handler.setLevel(logging.INFO)
+file_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] [%(name)s] %(message)s"))
+
+# Only WARNING and ERROR to console to keep user chat interface clean
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setLevel(logging.WARNING)
+console_handler.setFormatter(logging.Formatter("[%(levelname)s] %(message)s"))
+
 logging.basicConfig(
-    level=getattr(logging, settings.app.log_level.upper(), logging.INFO),
-    format="%(asctime)s [%(levelname)s] [%(name)s] %(message)s",
-    handlers=[
-        logging.FileHandler(log_file, encoding="utf-8"),
-        logging.StreamHandler(sys.stdout)
-    ]
+    level=logging.INFO,
+    handlers=[file_handler, console_handler]
 )
 
+# Silence verbose third-party loggers
+logging.getLogger("faster_whisper").setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("urllib3").setLevel(logging.WARNING)
+
 logger = logging.getLogger("Assistant")
+logger.setLevel(logging.INFO)
 
 # Initialize Latency CSV header if not existing
 if not latency_file.exists():

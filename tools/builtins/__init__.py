@@ -7,6 +7,7 @@ from tools.builtins.system_tools import (
     GetActiveWindowTitleTool,
     GetClipboardTool,
     SetClipboardTool,
+    LaunchAppTool,
 )
 from tools.builtins.file_tools import (
     ListDirectoryTool,
@@ -30,6 +31,7 @@ def register_default_tools(registry: ToolRegistry) -> None:
         GetActiveWindowTitleTool(),
         GetClipboardTool(),
         SetClipboardTool(),
+        LaunchAppTool(),
         ListDirectoryTool(),
         ReadTextFileTool(),
         SearchFilesTool(),

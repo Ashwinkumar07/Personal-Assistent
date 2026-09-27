@@ -115,3 +115,43 @@ class SetClipboardTool(BaseTool):
             return f"Successfully copied {len(text)} characters to clipboard."
         except Exception as e:
             return f"Failed to set clipboard: {e}"
+
+# 8. Launch Application Tool
+class LaunchAppArgs(BaseModel):
+    app_name: str = Field(..., description="The name or protocol of the application to launch (e.g. 'camera', 'notepad', 'calc', 'chrome').")
+
+class LaunchAppTool(BaseTool):
+    name = "launch_app"
+    description = "Launch a Windows application on the local desktop (e.g. Camera, Notepad, Calculator, Explorer, VSCode)."
+    risk_level = RiskLevel.WRITE
+    args_schema = LaunchAppArgs
+
+    def run(self, app_name: str) -> str:
+        import os
+        import subprocess
+        name = app_name.strip().lower()
+        
+        protocol_map = {
+            "camera": "start microsoft.windows.camera:",
+            "calculator": "start calc:",
+            "calc": "start calc:",
+            "notepad": "start notepad",
+            "explorer": "start explorer",
+            "settings": "start ms-settings:",
+            "photos": "start ms-photos:",
+            "paint": "start mspaint",
+            "terminal": "start wt",
+            "cmd": "start cmd",
+            "powershell": "start powershell",
+            "code": "start code",
+            "vscode": "start code",
+            "chrome": "start chrome",
+            "edge": "start msedge"
+        }
+
+        cmd = protocol_map.get(name, f"start {app_name}")
+        try:
+            subprocess.Popen(cmd, shell=True)
+            return f"Successfully launched {app_name}."
+        except Exception as e:
+            return f"Failed to launch {app_name}: {e}"

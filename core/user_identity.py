@@ -67,6 +67,17 @@ class UserIdentity:
     def user_name(self) -> str:
         return self.profile.get("user_name", "Aswin")
 
+    @property
+    def display_name(self) -> str:
+        """Returns the user's preferred honorific/title (e.g., 'Sir') or their name."""
+        return self.profile.get("preferred_title") or self.profile.get("user_name", "Aswin")
+
+    def set_preferred_title(self, title: str) -> None:
+        """Set how the assistant should address the user (e.g. 'Sir', 'Boss', 'Aswin')."""
+        clean_title = title.strip().title()
+        self.update_preference("preferred_title", clean_title)
+        logger.info(f"[IDENTITY] Preferred user title updated to: '{clean_title}'")
+
     def update_preference(self, key: str, value: Any) -> None:
         """Update a specific user preference."""
         self.profile[key] = value

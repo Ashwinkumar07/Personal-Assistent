@@ -18,9 +18,10 @@ from tools.builtins.file_tools import (
     MoveFileTool,
     DeleteFileTool,
 )
+from tools.builtins.camera_tool import InspectCameraSnapshotTool
 
 def register_default_tools(registry: ToolRegistry) -> None:
-    """Register the 15 standard safe built-in tools."""
+    """Register the standard safe built-in tools."""
     tools = [
         GetCurrentTimeTool(),
         GetCurrentDateTool(),
@@ -37,6 +38,7 @@ def register_default_tools(registry: ToolRegistry) -> None:
         CopyFileTool(),
         MoveFileTool(),
         DeleteFileTool(safety_gate=registry.safety_gate),
+        InspectCameraSnapshotTool(),
     ]
     for tool in tools:
         registry.register(tool)

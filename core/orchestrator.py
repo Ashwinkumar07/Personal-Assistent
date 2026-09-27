@@ -18,6 +18,8 @@ from core.kill_switch import KillSwitch
 from tools.registry import ToolRegistry
 from tools.builtins import register_default_tools
 
+from core.self_reflection import SelfReflectionEngine
+
 class OrchestratorState(str, Enum):
     IDLE = "IDLE"
     LISTENING = "LISTENING"
@@ -46,7 +48,8 @@ class Orchestrator:
         db_path: Optional[Path] = None,
         registry: Optional[ToolRegistry] = None,
         safety_gate: Optional[SafetyGate] = None,
-        kill_switch: Optional[KillSwitch] = None
+        kill_switch: Optional[KillSwitch] = None,
+        reflection_engine: Optional[SelfReflectionEngine] = None
     ):
         self.db_path = db_path or (PROJECT_ROOT / settings.app.data_dir / "orchestrator_state.sqlite3")
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -57,6 +60,7 @@ class Orchestrator:
         
         self.kill_switch = kill_switch or KillSwitch()
         self.kill_switch.register_callback(self._on_emergency_halt)
+        self.reflection_engine = reflection_engine or SelfReflectionEngine()
         
         self.current_state = OrchestratorState.IDLE
         self._init_database()
@@ -139,9 +143,19 @@ class Orchestrator:
             # Observe & Verify step
             self.current_state = OrchestratorState.VERIFYING
             if not exec_res["success"]:
-                logger.error(f"[ORCHESTRATOR] Step {idx+1} failed: {exec_res['error']}")
-                results.append({"step": idx+1, "status": "FAILED", "error": exec_res["error"]})
+                err_msg = str(exec_res.get("error", "Unknown error"))
+                logger.error(f"[ORCHESTRATOR] Step {idx+1} failed: {err_msg}")
+                results.append({"step": idx+1, "status": "FAILED", "error": err_msg})
                 
+                # Analyze mistake and create learned rule
+                reflection_report = self.reflection_engine.analyze_and_record_failure(
+                    goal=goal,
+                    tool_name=tool_name,
+                    args=args,
+                    error_msg=err_msg
+                )
+                logger.info(f"[ORCHESTRATOR] Autonomous Reflection: {reflection_report.get('rule')}")
+
                 # Single retry attempt if configured
                 logger.info(f"[ORCHESTRATOR] Attempting single self-correction retry for step {idx+1}...")
                 retry_res = self.registry.execute(name=tool_name, arguments=args, confirm_callback=confirm_callback)
@@ -152,6 +166,9 @@ class Orchestrator:
                     results.append({"step": idx+1, "status": "RETRY_PASSED", "result": retry_res["result"]})
             else:
                 results.append({"step": idx+1, "status": "SUCCESS", "result": exec_res["result"]})
+                # Reinforce successful learned pattern
+                keyword = goal.strip().split()[0].lower() if goal else tool_name
+                self.reflection_engine.record_success(keyword)
 
         self.current_state = OrchestratorState.REPORTING if not self.kill_switch.is_triggered else OrchestratorState.HALTED
         

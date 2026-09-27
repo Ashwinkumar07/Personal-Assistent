@@ -286,8 +286,8 @@ class AdaptiveLocalBrain(BaseBrain):
 
     def generate_response(self, prompt: str, context: Optional[str] = None) -> str:
         """
-        Generate a frank, natural, intelligent conversational response for Aswin,
-        incorporating taught facts, memory, and desktop context.
+        Generate an intelligent, frank, context-aware conversational response for Aswin,
+        incorporating semantic memory, taught rules, creator awareness, and intent understanding.
         """
         clean_prompt = prompt.strip().strip('"\'')
         
@@ -298,24 +298,44 @@ class AdaptiveLocalBrain(BaseBrain):
 
         p_lower = clean_prompt.lower().strip()
         name = self.identity.display_name
+        user_real_name = self.identity.user_name
 
-        # 2. What will you call me / Name / Identity queries
-        if any(w in p_lower for w in ["what will you call me", "what do you call me", "what is my title", "how do you address me"]):
+        # Normalize words for fuzzy intent classification
+        words = set(re.findall(r'\b[a-z]+\b', p_lower))
+
+        # 2. Creator & Origin queries ("Who is your creator / creater", "Who made you", "Who built you")
+        creator_terms = {"creator", "creater", "maker", "author", "builder", "owner", "master", "father", "developer"}
+        create_verbs = {"created", "made", "built", "programmed", "coded", "designed", "developed"}
+        if (words & creator_terms) or (("who" in words or "whose" in words) and (words & create_verbs)):
+            return (
+                f"You are my creator, {name}! ({user_real_name}). "
+                f"You designed and built me to be your 100% private, sovereign desktop assistant on Windows 11."
+            )
+
+        # 3. What will you call me / Name / Identity queries
+        if any(w in p_lower for w in ["what will you call me", "what do you call me", "what is my title", "how do you address me", "what's my title"]):
             pref_title = self.identity.profile.get("preferred_title")
             if pref_title:
-                return f"I address you as {pref_title}! You are {self.identity.user_name}, my sovereign user."
-            return f"I call you {self.identity.user_name}! If you want me to call you something else (like 'Sir' or 'Boss'), just tell me: \"Call me Sir\"."
+                return f"I address you as {pref_title}! You are {user_real_name}, my sovereign user and creator."
+            return f"I call you {user_real_name}! If you want me to call you something else (like 'Sir' or 'Boss'), just tell me: \"Call me Sir\"."
 
-        if "who am i" in p_lower or "tell me about myself" in p_lower:
+        if "who am i" in p_lower or "tell me about myself" in p_lower or "what is my name" in p_lower:
             facts = self.memory.list_all_facts()
             facts_str = ", ".join([f"{k}: {v}" for k, v in list(facts.items())[:4]]) if facts else "No extra facts recorded yet."
             return (
-                f"You are {self.identity.user_name}, and I address you as {name}. "
+                f"You are {user_real_name}, my creator, and I address you as {name}. "
                 f"Your working tone is '{self.identity.profile.get('tone', 'frank_and_concise')}'. "
                 f"Memory highlights: {facts_str}"
             )
 
-        # 3. Check for Memory and Fact recall queries
+        # 4. Doubts & Clarifications ("Ask anything you doubt", "Do you have any doubts?", "Clarify with me")
+        if any(w in p_lower for w in ["doubt", "doubts", "ask me", "clarify", "confused", "ask anything"]):
+            return (
+                f"Understood, {name}! Whenever I encounter an ambiguous command, a high-risk file operation, "
+                f"or missing parameters, I will ask you directly before taking action."
+            )
+
+        # 5. Check for Memory and Fact recall queries
         if any(w in p_lower for w in ["what do you remember", "what have you learned", "what do you know about me", "my memories", "list facts", "show rules"]):
             return self.get_memory_summary()
 
@@ -332,14 +352,14 @@ class AdaptiveLocalBrain(BaseBrain):
                     return f"From my memory: \"{v}\""
             return f"I don't have a record of your {target_prop} yet, {name}. You can teach me by saying: \"My {target_prop} is [value]\"."
 
-        # 4. Conversational Chit-Chat & Dialogues
+        # 6. Conversational Chit-Chat & Dialogues
         if any(w in p_lower for w in ["reply me first", "reply me", "talk to me", "are you there"]):
-            return f"I am right here with you, {name}! How can I help you right now?"
+            return f"I am right here with you, {name}! How can I help or what would you like to discuss right now?"
 
         if any(w in p_lower for w in ["hello", "hi", "hey", "yo", "greetings"]):
             return f"Hey {name}! I'm right here with you on your desktop. What are we working on or teaching today?"
         
-        elif "how are you" in p_lower or "how's your day" in p_lower:
+        elif "how are you" in p_lower or "how's your day" in p_lower or "how do you feel" in p_lower:
             return f"Running smooth, sharp, and 100% offline, {name}. Memory and reflection engines are active. How is everything going for you?"
         
         elif "who are you" in p_lower or "what are you" in p_lower:
@@ -365,10 +385,10 @@ class AdaptiveLocalBrain(BaseBrain):
             return "Why do programmers prefer dark mode? Because light attracts bugs!"
 
         elif "what do you think" in p_lower or "opinion" in p_lower:
-            return f"I believe keeping your assistant 100% private, sovereign, and locally taught is the highest-leverage setup. You have complete control over every rule and memory."
+            return f"I believe keeping your assistant 100% private, sovereign, and locally taught is the highest-leverage setup, {name}. You have complete control over every rule and memory."
 
-        elif "explain" in p_lower or "advice" in p_lower or "suggest" in p_lower:
-            return f"I'm listening, {name}. Break down the topic or goal, and I'll give you a direct, frank breakdown."
+        elif "explain" in p_lower or "advice" in p_lower or "suggest" in p_lower or "why" in p_lower:
+            return f"I'm listening, {name}. Tell me the details or goal, and I'll break it down directly for you."
 
         else:
             return (

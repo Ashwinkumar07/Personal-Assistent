@@ -77,7 +77,11 @@ def main():
         kill_switch=kill_switch,
         reflection_engine=reflection_engine
     )
-    brain = AdaptiveLocalBrain(user_identity=identity, reflection_engine=reflection_engine)
+    brain = AdaptiveLocalBrain(
+        user_identity=identity,
+        reflection_engine=reflection_engine,
+        memory_manager=memory_mgr
+    )
 
     # 5. Initialize Text-to-Speech engine
     tts = TextToSpeech()
@@ -157,8 +161,15 @@ def main():
                 if user_cmd.lower() in ("exit", "quit"):
                     shutdown()
 
+                # Special Command: Memory & Taught Facts
+                if user_cmd.lower() in ("memory", "facts", "what do you remember", "memories"):
+                    mem_text = brain.get_memory_summary()
+                    print(f"\n[Memory Store]\n{mem_text}\n")
+                    tts.speak("Here is everything I have learned and remembered.")
+                    continue
+
                 # Special Command: Reflection Summary
-                if user_cmd.lower() in ("reflection", "learned", "learning status"):
+                if user_cmd.lower() in ("reflection", "learned", "learning status", "rules"):
                     refl_text = reflection_engine.generate_daily_reflection()
                     print(f"\n[Reflection Engine] {refl_text}\n")
                     tts.speak("Here is the daily reflection summary of learned rules.")
@@ -175,10 +186,14 @@ def main():
                 active_win = activity_observer.get_current_active_window() if hasattr(activity_observer, "get_current_active_window") else ""
                 context = {"active_window": active_win, "user": identity.user_name}
 
-                # 1. Check if conversational chit-chat
+                # Record user input in episodic memory
+                memory_mgr.record_dialogue(role="user", content=user_cmd)
+
+                # 1. Check if conversational chit-chat or teaching
                 if brain.is_conversational(user_cmd):
                     reply = brain.generate_response(user_cmd, context=active_win)
                     print(f"[Assistant] {reply}\n")
+                    memory_mgr.record_dialogue(role="assistant", content=reply)
                     tts.speak(reply)
                     continue
 
@@ -188,6 +203,7 @@ def main():
                 if not steps:
                     reply = brain.generate_response(user_cmd, context=active_win)
                     print(f"[Assistant] {reply}\n")
+                    memory_mgr.record_dialogue(role="assistant", content=reply)
                     tts.speak(reply)
                     continue
 

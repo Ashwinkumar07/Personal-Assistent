@@ -32,7 +32,7 @@ from memory.manager import MemoryManager
 from awareness.active_app import ActivityObserver
 from brain.adaptive_brain import AdaptiveLocalBrain
 from ui.tray_app import SystemTrayApp
-
+from voice.tts import TextToSpeech
 from voice.continuous_listener import ContinuousVoiceListener
 
 def main():

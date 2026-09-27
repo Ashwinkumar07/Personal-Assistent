@@ -30,13 +30,37 @@ class SpeechToText:
         self._load_model()
 
     def _load_model(self) -> None:
-        """Load or initialize faster-whisper WhisperModel."""
+        """Load or initialize faster-whisper WhisperModel directly from local cache."""
         try:
             from faster_whisper import WhisperModel
             os.environ["OMP_NUM_THREADS"] = str(self.num_threads)
+            
+            # Check for existing downloaded local snapshot to avoid online HTTP requests
+            model_target = self.model_size
+            download_path = Path(self.download_root)
+            if download_path.exists():
+                snapshots = list(download_path.glob("**/snapshots/*"))
+                if snapshots and snapshots[0].is_dir():
+                    model_target = str(snapshots[0])
+                    logger.info(f"[STT] Found offline model snapshot: {model_target}")
+
             logger.info(f"Loading STT model '{self.model_size}' (device={self.device}, compute={self.compute_type}, threads={self.num_threads})...")
             
             with log_latency("STT._load_model", self.model_size):
+                self.model = WhisperModel(
+                    model_target,
+                    device=self.device,
+                    compute_type=self.compute_type,
+                    cpu_threads=self.num_threads,
+                    download_root=self.download_root,
+                    local_files_only=True if model_target != self.model_size else False
+                )
+            logger.info("STT model loaded successfully (100% Offline).")
+        except Exception as e:
+            logger.error(f"Failed to load faster-whisper model: {e}")
+            # Fallback to standard download
+            try:
+                from faster_whisper import WhisperModel
                 self.model = WhisperModel(
                     self.model_size,
                     device=self.device,
@@ -44,10 +68,9 @@ class SpeechToText:
                     cpu_threads=self.num_threads,
                     download_root=self.download_root
                 )
-            logger.info("STT model loaded successfully.")
-        except Exception as e:
-            logger.error(f"Failed to load faster-whisper model: {e}")
-            self.model = None
+            except Exception as e2:
+                logger.error(f"Fallback STT model load failed: {e2}")
+                self.model = None
 
     def transcribe(self, audio_data: np.ndarray, language: str = settings.voice.stt.language) -> str:
         """

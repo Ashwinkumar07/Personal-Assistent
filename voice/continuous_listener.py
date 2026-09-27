@@ -23,30 +23,34 @@ from voice.stt import SpeechToText
 from voice.tts import TextToSpeech
 
 class ContinuousVoiceListener:
-    """Listens continuously for hands-free voice commands."""
+    """Listens continuously for hands-free voice commands with adaptive noise calibration."""
 
     def __init__(
         self,
         on_command_callback: Optional[Callable[[str], str]] = None,
         tts_engine: Optional[TextToSpeech] = None
     ):
-        self.audio_io = AudioIO(sample_rate=16000)
-        self.vad = VoiceActivityDetector()
-        self.stt = None
+        self.sample_rate = 16000
+        self.chunk_duration_sec = 0.2  # 200ms chunks for rapid responsiveness
+        self.chunk_samples = int(self.sample_rate * self.chunk_duration_sec)
+        
+        self.vad = VoiceActivityDetector(sample_rate=self.sample_rate)
+        self.stt: Optional[SpeechToText] = None
         self.tts = tts_engine or TextToSpeech()
         self.on_command_callback = on_command_callback
         
         self.is_running = False
         self._thread: Optional[threading.Thread] = None
         self._is_speaking = False
+        self.ambient_rms = 0.015  # Default baseline noise floor
 
     def _init_stt(self) -> None:
-        """Lazy load STT to avoid blocking startup."""
+        """Lazy load STT in background to avoid blocking startup."""
         if self.stt is None:
             try:
                 self.stt = SpeechToText()
             except Exception as e:
-                logger.error(f"[VOICE] STT initialization note: {e}")
+                logger.error(f"[VOICE] STT initialization error: {e}")
 
     def start(self) -> None:
         """Start continuous background listening."""
@@ -65,40 +69,70 @@ class ContinuousVoiceListener:
         logger.info("[VOICE] Continuous Voice Listener stopped.")
 
     def speak(self, text: str) -> None:
-        """Speak out loud to Aswin while temporarily pausing mic echo."""
+        """Speak out loud while temporarily pausing microphone capture."""
         self._is_speaking = True
         try:
             self.tts.speak(text)
         finally:
-            time.sleep(0.3)  # Buffer to avoid hearing own echo
+            time.sleep(0.4)  # Echo cancellation grace period
             self._is_speaking = False
 
+    def _calibrate_ambient(self, stream, num_chunks: int = 3) -> None:
+        """Measure ambient room noise to establish dynamic energy threshold."""
+        try:
+            rms_vals = []
+            for _ in range(num_chunks):
+                chunk, _ = stream.read(self.chunk_samples)
+                chunk_flat = chunk.flatten()
+                val = float(np.sqrt(np.mean(chunk_flat**2)))
+                rms_vals.append(val)
+            if rms_vals:
+                self.ambient_rms = float(np.mean(rms_vals))
+                logger.info(f"[VOICE] Calibrated ambient noise floor: {self.ambient_rms:.4f}")
+        except Exception as e:
+            logger.debug(f"[VOICE] Noise calibration note: {e}")
+
     def _listen_loop(self) -> None:
-        """Continuous audio chunk stream evaluator."""
+        """Continuous audio chunk stream evaluator with adaptive threshold."""
         self._init_stt()
-        sample_rate = 16000
-        chunk_duration_sec = 0.5
-        chunk_samples = int(sample_rate * chunk_duration_sec)
         
+        try:
+            import sounddevice as sd
+        except ImportError:
+            logger.warning("[VOICE] sounddevice is not installed. Voice listener disabled.")
+            return
+
         speech_buffer = []
         silence_chunks = 0
         in_speech = False
-        
-        # Audio input stream
+        max_speech_chunks = 35  # ~7 seconds maximum utterance limit
+
         try:
-            import sounddevice as sd
-            with sd.InputStream(samplerate=sample_rate, channels=1, dtype='float32') as stream:
+            with sd.InputStream(samplerate=self.sample_rate, channels=1, dtype='float32') as stream:
+                self._calibrate_ambient(stream)
+                
                 while self.is_running:
                     if self._is_speaking:
                         time.sleep(0.1)
+                        # Reset buffer while assistant is speaking so it doesn't hear itself
+                        speech_buffer = []
+                        in_speech = False
+                        silence_chunks = 0
                         continue
 
-                    audio_chunk, _ = stream.read(chunk_samples)
+                    try:
+                        audio_chunk, overflowed = stream.read(self.chunk_samples)
+                    except Exception as e:
+                        time.sleep(0.1)
+                        continue
+
                     chunk_flat = audio_chunk.flatten()
+                    chunk_rms = float(np.sqrt(np.mean(chunk_flat**2)))
 
-                    has_speech = self.vad.is_speech_energy(chunk_flat, energy_threshold=0.018)
+                    # Dynamic speech threshold based on room background noise
+                    speech_threshold = max(0.012, self.ambient_rms * 1.65)
 
-                    if has_speech:
+                    if chunk_rms > speech_threshold:
                         speech_buffer.append(chunk_flat)
                         silence_chunks = 0
                         in_speech = True
@@ -106,26 +140,33 @@ class ContinuousVoiceListener:
                         silence_chunks += 1
                         speech_buffer.append(chunk_flat)
 
-                        # End of utterance detected (~1.5s of silence after speech)
-                        if silence_chunks >= 3:
+                        # End of utterance: ~0.8s silence (4 chunks) or hit max duration
+                        if silence_chunks >= 4 or len(speech_buffer) >= max_speech_chunks:
                             full_audio = np.concatenate(speech_buffer)
                             speech_buffer = []
                             in_speech = False
                             silence_chunks = 0
 
-                            # Transcribe if audio is meaningful length (>0.6s)
-                            if len(full_audio) > int(sample_rate * 0.6) and self.stt:
+                            # Process speech if length > 0.4 seconds
+                            if len(full_audio) > int(self.sample_rate * 0.4) and self.stt:
                                 try:
-                                    text = self.stt.transcribe(full_audio)
+                                    # Trim silence from ends
+                                    trimmed = self.vad.trim_silence(full_audio, threshold=self.ambient_rms * 1.1)
+                                    target_audio = trimmed if len(trimmed) > int(self.sample_rate * 0.3) else full_audio
+                                    
+                                    text = self.stt.transcribe(target_audio)
                                     if text and len(text.strip()) > 1:
+                                        print(f"\n[🎙️ Voice Input] Aswin: \"{text}\"")
                                         logger.info(f"[VOICE DETECTED] Aswin said: '{text}'")
                                         if self.on_command_callback:
                                             reply = self.on_command_callback(text)
                                             if reply:
+                                                print(f"[🤖 Voice Output] Assistant: \"{reply}\"\n")
                                                 self.speak(reply)
                                 except Exception as e:
                                     logger.error(f"[VOICE] Transcription error: {e}")
                     else:
-                        time.sleep(0.05)
+                        # Adapt ambient background noise tracking when quiet
+                        self.ambient_rms = self.ambient_rms * 0.95 + chunk_rms * 0.05
         except Exception as e:
-            logger.debug(f"[VOICE] Microphone stream note: {e}")
+            logger.error(f"[VOICE] Microphone stream error: {e}")

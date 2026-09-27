@@ -15,14 +15,18 @@ from core.user_identity import UserIdentity
 from core.self_reflection import SelfReflectionEngine
 from memory.manager import MemoryManager
 from brain.llm_client import BaseBrain
+from brain.cognitive_engine import CognitiveEngine
 
 class AdaptiveLocalBrain(BaseBrain):
     """
     Intelligent, private local brain that adapts its decisions based on:
-    - User Identity & Preferences (Aswin)
+    - Cognitive Engine (System 1 + System 2 Reasoning)
+    - Dynamic Few-Shot In-Context Memory Retrieval
+    - User Identity & Preferences (Aswin / Sir)
     - Active Desktop Environment (Foreground App, Clipboard)
     - Learned Rules from Past Mistakes (Self-Reflection Database)
     - Semantic Memory (Taught Facts, Habits, Preferences)
+    - Procedural Workflows (Taught Multi-Step Macros)
     """
 
     def __init__(
@@ -34,7 +38,12 @@ class AdaptiveLocalBrain(BaseBrain):
         self.identity = user_identity or UserIdentity()
         self.reflection = reflection_engine or SelfReflectionEngine()
         self.memory = memory_manager or MemoryManager()
-        logger.info(f"[ADAPTIVE BRAIN] Initialized for {self.identity.user_name} with Memory & Reflection active.")
+        self.cognitive = CognitiveEngine(
+            user_identity=self.identity,
+            reflection_engine=self.reflection,
+            memory_manager=self.memory
+        )
+        logger.info(f"[ADAPTIVE BRAIN] Cognitive Learning & Reasoning Engine initialized for {self.identity.display_name}.")
 
     def teach_fact_or_rule(self, user_input: str) -> Optional[str]:
         """
@@ -44,6 +53,11 @@ class AdaptiveLocalBrain(BaseBrain):
         text = user_input.strip().strip('"\'')
         lower = text.lower()
         name = self.identity.display_name
+
+        # Pattern: Workflow Compilation ("When I say X, do Y and Z")
+        workflow_reply = self.cognitive.parse_and_learn_workflow(text)
+        if workflow_reply:
+            return workflow_reply
 
         # Pattern 0: Direct Name / Title change ("Call me Sir", "You will call me Sir", "Address me as Boss")
         title_match = re.search(r'(?:from now on\s+)?(?:you will\s+)?(?:call me|address me as)\s+([a-zA-Z\s]+)', text, re.IGNORECASE)
@@ -163,10 +177,24 @@ class AdaptiveLocalBrain(BaseBrain):
         ]):
             return []
 
-        # 2. Check for relevant Learned Rules from past mistakes
-        learned_rules = self.reflection.get_relevant_rules(clean_cmd)
-        if learned_rules:
-            logger.info(f"[ADAPTIVE BRAIN] Applied {len(learned_rules)} learned rule(s) for command '{clean_cmd}'.")
+        # 2. Check for relevant Learned Rules from past mistakes & In-Context Context
+        context_data = self.cognitive.retrieve_relevant_context(clean_cmd)
+        if context_data.get("rules"):
+            logger.info(f"[ADAPTIVE BRAIN] Injected {len(context_data['rules'])} learned rule(s) for command '{clean_cmd}'.")
+
+        # Check for compiled Procedural Workflows
+        wf = context_data.get("workflow")
+        if wf and wf.get("steps"):
+            logger.info(f"[ADAPTIVE BRAIN] Executing compiled workflow '{wf['name']}' with {len(wf['steps'])} step(s).")
+            wf_steps = []
+            for s in wf["steps"]:
+                action_str = s.get("action", "")
+                sub_steps = self.plan_steps(action_str, available_tools, context=context)
+                if sub_steps:
+                    wf_steps.extend(sub_steps)
+                else:
+                    wf_steps.append({"tool": "get_current_time", "args": {}, "description": s.get("description", action_str)})
+            return wf_steps
 
         steps: List[Dict[str, Any]] = []
 

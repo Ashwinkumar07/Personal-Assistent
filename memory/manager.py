@@ -125,3 +125,24 @@ class MemoryManager:
             return [{"command": r[0], "tool_call": r[1]} for r in cursor.fetchall()]
         finally:
             conn.close()
+
+    # --- ADVANCED SEMANTIC SEARCH & SNAPSHOT ---
+    def search_memories(self, query: str, limit: int = 5) -> List[Dict[str, str]]:
+        """Search across semantic facts, procedural workflows, and past dialogue history."""
+        q_words = set(query.lower().split())
+        results = []
+        
+        # 1. Semantic facts
+        facts = self.list_all_facts()
+        for k, v in facts.items():
+            words = set((k + " " + v).lower().split())
+            if q_words & words:
+                results.append({"type": "fact", "key": k, "content": v})
+
+        # 2. Recent dialogue
+        dialogue = self.get_recent_dialogue(limit=10)
+        for turn in dialogue:
+            if any(w in turn["content"].lower() for w in q_words):
+                results.append({"type": "dialogue", "key": turn["role"], "content": turn["content"]})
+
+        return results[:limit]
